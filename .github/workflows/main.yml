@@ -1,0 +1,29 @@
+name: Move issue to Done when all tasks are completed
+
+on:
+  issues:
+    types: [edited]
+
+jobs:
+  check-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if all tasks are complete
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = context.payload.issue.body;
+            const allTasks = body
+              .split('\n')
+              .filter(line => line.trim().startsWith('- ['));
+            const allChecked = allTasks.length > 0 && allTasks.every(line => line.includes('[x]'));
+
+            if (allChecked) {
+              await github.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['Done']
+              });
+            }
