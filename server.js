@@ -143,15 +143,6 @@ app.get('/auth/steam/return',
   }
 );
 
-// Приклад для звичайного логіну/реєстрації (додайте у відповідний роут):
-// res.json({
-//   token: accessToken,
-//   accessToken,
-//   refreshToken,
-//   role: user.role_id,
-//   username: user.username
-// });
-
 // Обробка помилок
 app.use((err, req, res, next) => {
     console.error(err.stack);
