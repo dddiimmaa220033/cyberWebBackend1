@@ -1,0 +1,75 @@
+name: Update Project Status by Checklist
+
+on:
+  issues:
+    types: [edited]
+
+jobs:
+  update-project-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine task completion state
+        id: check_tasks
+        run: |
+          echo "📋 Аналіз чекбоксів..."
+          body="${{ github.event.issue.body }}"
+          total=$(echo "$body" | grep -c '\- \[' || true)
+          checked=$(echo "$body" | grep -c '\- \[x\]' || true)
+
+          echo "total=$total" >> $GITHUB_OUTPUT
+          echo "checked=$checked" >> $GITHUB_OUTPUT
+
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh jq
+
+      - name: Authenticate gh CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Set Project Status
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          CHECKED: ${{ steps.check_tasks.outputs.checked }}
+          TOTAL: ${{ steps.check_tasks.outputs.total }}
+          PROJECT_NUMBER: 1 # 🔁 заміни на твій номер проєкту
+        run: |
+          echo "⏳ Отримуємо URL issue..."
+          ISSUE_URL="https://github.com/$OWNER/$REPO/issues/$ISSUE_NUMBER"
+
+          if [ "$TOTAL" -eq 0 ]; then
+            STATUS="To Do"
+          elif [ "$CHECKED" -eq "$TOTAL" ]; then
+            STATUS="Done"
+          else
+            STATUS="In Progress"
+          fi
+
+          echo "🎯 Обрано статус: $STATUS"
+
+          echo "🔍 Отримуємо ID проєкту..."
+          PROJECT_ID=$(gh project list --owner "$OWNER" --format json | jq -r '.[] | select(.number=='"$PROJECT_NUMBER"') | .id')
+
+          echo "🔍 Отримуємо ID елемента..."
+          ITEM_ID=$(gh project item-list --owner "$OWNER" --project-id "$PROJECT_ID" --format json | jq -r '.[] | select(.content.url=="'"$ISSUE_URL"'") | .id')
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "❌ Не знайдено елемент у проєкті!"
+            exit 1
+          fi
+
+          echo "📌 Отримуємо поле 'Status'..."
+          FIELD_ID=$(gh project field-list --owner "$OWNER" --project-id "$PROJECT_ID" --format json | jq -r '.[] | select(.name=="Status") | .id')
+
+          echo "📌 Отримуємо ID варіанту статусу..."
+          STATUS_OPTION_ID=$(gh project field-list --owner "$OWNER" --project-id "$PROJECT_ID" --format json | jq -r '.[] | select(.name=="Status") | .options[] | select(.name=="'"$STATUS"'") | .id')
+
+          if [ -z "$FIELD_ID" ] || [ -z "$STATUS_OPTION_ID" ]; then
+            echo "❌ Не вдалося знайти поле або значення статусу!"
+            exit 1
+          fi
+
+          echo "✅ Оновлюємо статус..."
+          gh project item-edit "$ITEM_ID" \
+            --field-id "$FIELD_ID" \
+            --single-select-option-id "$STATUS_OPTION_ID"
