@@ -1,29 +1,68 @@
-name: Move issue to Done when all tasks are completed
+name: Update Project Status by Checklist
 
 on:
   issues:
     types: [edited]
 
 jobs:
-  check-tasks:
+  update-project-status:
     runs-on: ubuntu-latest
     steps:
-      - name: Check if all tasks are complete
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const body = context.payload.issue.body;
-            const allTasks = body
-              .split('\n')
-              .filter(line => line.trim().startsWith('- ['));
-            const allChecked = allTasks.length > 0 && allTasks.every(line => line.includes('[x]'));
+      - name: Determine task completion state
+        id: check_tasks
+        run: |
+          echo "📋 Аналіз чекбоксів..."
+          body="${{ github.event.issue.body }}"
+          total=$(echo "$body" | grep -c '\- \[' || true)
+          checked=$(echo "$body" | grep -c '\- \[x\]' || true)
 
-            if (allChecked) {
-              await github.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                labels: ['Done']
-              });
-            }
+          echo "total=$total" >> $GITHUB_OUTPUT
+          echo "checked=$checked" >> $GITHUB_OUTPUT
+
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
+
+      - name: Authenticate gh CLI
+        run: echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
+
+      - name: Set Project Status
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          CHECKED: ${{ steps.check_tasks.outputs.checked }}
+          TOTAL: ${{ steps.check_tasks.outputs.total }}
+        run: |
+          ISSUE_URL="https://github.com/$OWNER/$REPO/issues/$ISSUE_NUMBER"
+
+          if [ "$TOTAL" -eq 0 ]; then
+            STATUS="To Do"
+          elif [ "$CHECKED" -eq "$TOTAL" ]; then
+            STATUS="Done"
+          else
+            STATUS="In Progress"
+          fi
+
+          echo "🎯 Ставимо статус: $STATUS"
+
+          # Отримати ID елемента з проекту
+          ITEM_ID=$(gh project item-list --owner "$OWNER" --format json --limit 100 | jq -r '.[] | select(.content.url=="'"$ISSUE_URL"'") | .id')
+
+          if [ -z "$ITEM_ID" ]; then
+            echo "❌ Не знайдено елемент у проєкті!"
+            exit 1
+          fi
+
+          # Отримати ID поля "Status"
+          FIELD_ID=$(gh project field-list --owner "$OWNER" --format json | jq -r '.[] | select(.name=="Status") | .id')
+
+          # Отримати значення для статусу
+          STATUS_OPTION_ID=$(gh project field-list --owner "$OWNER" --format json | jq -r '.[] | select(.name=="Status") | .options[] | select(.name=="'"$STATUS"'") | .id')
+
+          if [ -z "$FIELD_ID" ] || [ -z "$STATUS_OPTION_ID" ]; then
+            echo "❌ Не вдалося знайти поле або значення статусу!"
+            exit 1
+          fi
+
+          # Оновити статус
+          gh project item-edit "$ITEM_ID" --field-id "$FIELD_ID" --single-select-option-id "$STATUS_OPTION_ID"
