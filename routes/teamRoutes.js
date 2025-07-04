@@ -28,6 +28,12 @@ router.post("/:teamId/join",
     teamController.joinTeam
 );
 
+// Список команд користувача
+router.get("/my", 
+    verifyToken, 
+    teamController.getUserTeams
+);
+
 // Інформація про команду
 router.get("/:id", 
     verifyToken, 

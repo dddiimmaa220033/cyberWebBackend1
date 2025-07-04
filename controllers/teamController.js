@@ -342,3 +342,21 @@ exports.getAllTeams = async (req, res) => {
     });
   }
 };
+
+// Отримати всі команди, де користувач є учасником або капітаном
+exports.getUserTeams = async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const teams = await pool.query(
+      `SELECT t.id, t.name, t.discipline, tm.is_captain
+       FROM team_members tm
+       JOIN teams t ON tm.team_id = t.id
+       WHERE tm.user_id = $1`,
+      [userId]
+    );
+    res.json(teams.rows);
+  } catch (err) {
+    console.error('Помилка отримання команд користувача:', err);
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};
