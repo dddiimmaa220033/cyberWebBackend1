@@ -360,3 +360,107 @@ exports.getUserTeams = async (req, res) => {
     res.status(500).json({ error: "Помилка сервера" });
   }
 };
+
+// Надіслати інвайт користувачу
+exports.inviteUser = async (req, res) => {
+  const { teamId } = req.params;
+  const { toUserId } = req.body;
+  const fromUserId = req.user.userId;
+  try {
+    // Перевірити, чи вже в команді
+    const memberQ = await pool.query(
+      `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
+      [teamId, toUserId]
+    );
+    if (memberQ.rows.length) return res.status(400).json({ error: "Користувач вже в цій команді" });
+
+    // Перевірити, чи вже є активний інвайт
+    const exists = await pool.query(
+      `SELECT 1 FROM invites WHERE team_id = $1 AND to_user_id = $2 AND status = 'pending'`,
+      [teamId, toUserId]
+    );
+    if (exists.rows.length) return res.status(400).json({ error: "Запрошення вже надіслано" });
+
+    await pool.query(
+      `INSERT INTO invites (team_id, from_user_id, to_user_id) VALUES ($1, $2, $3)`,
+      [teamId, fromUserId, toUserId]
+    );
+    res.json({ message: "Інвайт надіслано" });
+  } catch (err) {
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};
+
+// Отримати всі інвайти користувача
+exports.getUserInvites = async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const invites = await pool.query(
+      `SELECT i.id, i.team_id, t.name as team_name, i.from_user_id, u.username as from_username, i.status
+       FROM invites i
+       JOIN teams t ON i.team_id = t.id
+       JOIN users u ON i.from_user_id = u.id
+       WHERE i.to_user_id = $1 AND i.status = 'pending'`,
+      [userId]
+    );
+    res.json(invites.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};
+
+// Прийняти інвайт
+exports.acceptInvite = async (req, res) => {
+  const { inviteId } = req.params;
+  const userId = req.user.userId;
+  try {
+    // Знайти інвайт
+    const inviteQ = await pool.query(
+      `SELECT * FROM invites WHERE id = $1 AND to_user_id = $2 AND status = 'pending'`,
+      [inviteId, userId]
+    );
+    if (!inviteQ.rows.length) return res.status(404).json({ error: "Інвайт не знайдено" });
+    const { team_id } = inviteQ.rows[0];
+
+    // Перевірити, чи вже в команді
+    const memberQ = await pool.query(
+      `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
+      [team_id, userId]
+    );
+    if (memberQ.rows.length) return res.status(400).json({ error: "Ви вже в цій команді" });
+
+    // Додати в команду
+    await pool.query(
+      `INSERT INTO team_members (team_id, user_id) VALUES ($1, $2)`,
+      [team_id, userId]
+    );
+    // Оновити статус інвайта
+    await pool.query(
+      `UPDATE invites SET status = 'accepted' WHERE id = $1`,
+      [inviteId]
+    );
+    // Видалити/деактивувати всі інші інвайти для цього користувача
+    await pool.query(
+      `UPDATE invites SET status = 'declined' WHERE to_user_id = $1 AND team_id != $2`,
+      [userId, team_id]
+    );
+    res.json({ message: "Ви приєдналися до команди" });
+  } catch (err) {
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};
+
+// Відхилити інвайт
+exports.declineInvite = async (req, res) => {
+  const { inviteId } = req.params;
+  const userId = req.user.userId;
+  try {
+    await pool.query(
+      `UPDATE invites SET status = 'declined' WHERE id = $1 AND to_user_id = $2`,
+      [inviteId, userId]
+    );
+    res.json({ message: "Інвайт відхилено" });
+  } catch (err) {
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};

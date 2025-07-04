@@ -22,6 +22,30 @@ router.post("/:teamId/members",
     teamController.addMember
 );
 
+// Запрошення користувача до команди
+router.post("/:teamId/invite", 
+    verifyToken, 
+    teamController.inviteUser
+);
+
+// Отримати всі запрошення користувача
+router.get("/invites", 
+    verifyToken, 
+    teamController.getUserInvites
+);
+
+// Прийняти запрошення
+router.post("/invites/:inviteId/accept", 
+    verifyToken, 
+    teamController.acceptInvite
+);
+
+// Відхилити запрошення
+router.post("/invites/:inviteId/decline", 
+    verifyToken, 
+    teamController.declineInvite
+);
+
 // Приєднання до команди
 router.post("/:teamId/join", 
     verifyToken, 

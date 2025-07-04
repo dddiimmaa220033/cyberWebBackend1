@@ -13,6 +13,8 @@ const tournamentRoutes = require("./routes/tournamentRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const matchRoutes = require("./routes/matchRoutes");
 const dailyTaskRoutes = require("./routes/dailyTaskRoutes");
+const userRoutes = require("./routes/userRoutes");
+
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -104,6 +106,7 @@ app.use("/tournaments", tournamentRoutes);
 app.use("/teams", teamRoutes);
 app.use("/matches", matchRoutes);
 app.use("/daily-tasks", dailyTaskRoutes);
+app.use("/users", userRoutes);
 
 // Steam auth routes
 app.get('/auth/steam',
