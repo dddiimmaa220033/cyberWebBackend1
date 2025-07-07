@@ -22,17 +22,17 @@ exports.getTournaments = async (req, res) => {
 exports.createTournament = async (req, res) => {
   const {
     name, format, rules, description,
-    start_date, end_date, max_teams, status
+    start_date, end_date, max_teams, status, players_per_team
   } = req.body;
   const userId = req.user.userId;
 
   try {
     const result = await pool.query(
       `INSERT INTO tournaments
-         (name, format, rules, description, start_date, end_date, max_teams, created_by, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (name, format, rules, description, start_date, end_date, max_teams, created_by, status, players_per_team)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
-      [name, format, rules, description, start_date, end_date, max_teams, userId, status || "запланований"]
+      [name, format, rules, description, start_date, end_date, max_teams, userId, status || "запланований", players_per_team]
     );
     res.status(201).json({ message: "Tournament created", tournament: result.rows[0] });
   } catch (err) {

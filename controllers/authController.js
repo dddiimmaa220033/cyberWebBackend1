@@ -6,7 +6,7 @@ const { SECRET_KEY } = require('../config/config');
 
 exports.register = async (req, res) => {
   const { username, password } = req.body;
-  const role = 2; // player
+  const role = 1; 
   try {
     const { rows } = await pool.query("SELECT 1 FROM users WHERE username = $1", [username]);
     if (rows.length) return res.status(400).json({ error: 'Username already exists' });
