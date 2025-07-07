@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getTournaments,
+  getTournamentById, // додай цей імпорт
   createTournament,
   updateTournament,
   deleteTournament,
@@ -29,5 +30,8 @@ router.post("/:id/generate-first-round", verifyToken, isOrganizer, generateFirst
 
 // Генерувати наступний раунд
 router.post("/:id/next-round", verifyToken, isOrganizer, generateNextRound);
+
+// Додай цей маршрут ПЕРЕД router.post("/:id/...")
+router.get("/:id", getTournamentById);
 
 module.exports = router;
