@@ -17,7 +17,7 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ error: "Назва команди повинна містити від 3 до 50 символів" });
         }
 
-        const validDisciplines = ['Футбол', 'Баскетбол', 'Волейбол', 'Кіберспорт'];
+        const validDisciplines = ['CS1.6'];
         if (!validDisciplines.includes(discipline)) {
             return res.status(400).json({ error: "Невірна дисципліна" });
         }

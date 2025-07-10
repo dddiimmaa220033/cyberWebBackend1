@@ -6,7 +6,8 @@ const {
   updateTournament,
   deleteTournament,
   generateFirstRound,
-  generateNextRound
+  generateNextRound,
+  checkTournamentName
 } = require("../controllers/tournamentController");
 
 const verifyToken = require("../middleware/authMiddleware");
@@ -31,7 +32,9 @@ router.post("/:id/generate-first-round", verifyToken, isOrganizer, generateFirst
 // Генерувати наступний раунд
 router.post("/:id/next-round", verifyToken, isOrganizer, generateNextRound);
 
-// Додай цей маршрут ПЕРЕД router.post("/:id/...")
+// ДОДАЙ ЦЕ ПЕРЕД router.get("/:id", ...)
+router.get("/check-name", checkTournamentName);
+
 router.get("/:id", getTournamentById);
 
 module.exports = router;

@@ -22,17 +22,18 @@ exports.getTournaments = async (req, res) => {
 exports.createTournament = async (req, res) => {
   const {
     name, format, rules, description,
-    start_date, end_date, max_teams, status, players_per_team
+    start_date, end_date, max_teams, status, players_per_team,
+    ready_start, ready_end, registration_end // додано registration_end
   } = req.body;
   const userId = req.user.userId;
 
   try {
     const result = await pool.query(
       `INSERT INTO tournaments
-         (name, format, rules, description, start_date, end_date, max_teams, created_by, status, players_per_team)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (name, format, rules, description, start_date, end_date, max_teams, created_by, status, players_per_team, ready_start, ready_end, registration_end)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
-      [name, format, rules, description, start_date, end_date, max_teams, userId, status || "запланований", players_per_team]
+      [name, format, rules, description, start_date, end_date, max_teams, userId, status || "запланований", players_per_team, ready_start, ready_end, registration_end]
     );
     res.status(201).json({ message: "Tournament created", tournament: result.rows[0] });
   } catch (err) {
@@ -46,7 +47,8 @@ exports.updateTournament = async (req, res) => {
   const { id } = req.params;
   const {
     name, format, rules, description,
-    start_date, end_date, max_teams, status
+    start_date, end_date, max_teams, status,
+    ready_start, ready_end, registration_end // додано registration_end
   } = req.body;
   const userId = req.user.userId;
 
@@ -70,10 +72,11 @@ exports.updateTournament = async (req, res) => {
     const result = await pool.query(
       `UPDATE tournaments
          SET name=$1, format=$2, rules=$3, description=$4,
-             start_date=$5, end_date=$6, max_teams=$7, status=$8
-       WHERE id=$9
+             start_date=$5, end_date=$6, max_teams=$7, status=$8,
+             ready_start=$9, ready_end=$10, registration_end=$11
+       WHERE id=$12
        RETURNING *`,
-      [name, format, rules, description, start_date, end_date, max_teams, status, id]
+      [name, format, rules, description, start_date, end_date, max_teams, status, ready_start, ready_end, registration_end, id]
     );
 
     res.json({ message: "Tournament updated", tournament: result.rows[0] });
@@ -172,5 +175,18 @@ exports.getTournamentById = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Перевірка унікальності назви турніру
+exports.checkTournamentName = async (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ exists: false });
+  try {
+    const result = await pool.query("SELECT 1 FROM tournaments WHERE name = $1 LIMIT 1", [name]);
+    res.json({ exists: result.rows.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ exists: false });
   }
 };
