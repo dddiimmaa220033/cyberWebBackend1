@@ -302,7 +302,7 @@ exports.getAllTeams = async (req, res) => {
   try {
     // Додаємо is_private у SELECT
     const teams = await pool.query(`
-      SELECT id, name, discipline, is_private
+      SELECT id, name, discipline, is_private, created_by
       FROM teams
       ORDER BY name
     `);
@@ -352,7 +352,8 @@ exports.getAllTeams = async (req, res) => {
           teamId: team.id,
           teamName: team.name,
           discipline: team.discipline,
-          is_private: team.is_private, // ДОДАНО
+          is_private: team.is_private,
+          created_by: team.created_by,
           rating: rating,
           wins: winsCount,
           losses: lossesCount,
