@@ -2,7 +2,7 @@ const pool = require("../config/db");
 
 // Створення команди
 exports.createTeam = async (req, res) => {
-    const { name, discipline } = req.body;
+    const { name, discipline, is_private } = req.body; // Додано is_private
     const captainId = req.user.userId;
   
     try {
@@ -22,12 +22,12 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ error: "Невірна дисципліна" });
         }
 
-        // Створення команди
+        // Створення команди з is_private
         const teamResult = await pool.query(
-            `INSERT INTO teams (name, discipline, created_by) 
-             VALUES ($1, $2, $3) 
+            `INSERT INTO teams (name, discipline, created_by, is_private) 
+             VALUES ($1, $2, $3, $4) 
              RETURNING *`, 
-            [name, discipline, captainId]
+            [name, discipline, captainId, is_private]
         );
 
         // Додавання капітана
@@ -132,30 +132,58 @@ exports.getTeamDetails = async (req, res) => {
 exports.joinTeam = async (req, res) => {
     const { teamId } = req.params;
     const userId = req.user.userId;
-  
+
     try {
+        // Перевірка існування команди
         const teamExists = await pool.query("SELECT 1 FROM teams WHERE id = $1", [teamId]);
         if (!teamExists.rows.length) {
             return res.status(404).json({ error: "Команду не знайдено" });
         }
-  
+
+        // Перевірка блокування користувача
         const user = await pool.query("SELECT is_blocked FROM users WHERE id = $1", [userId]);
         if (user.rows[0].is_blocked) {
             return res.status(403).json({ error: "Заблоковані користувачі не можуть приєднуватися до команд" });
         }
-  
-        const existingMembership = await pool.query("SELECT 1 FROM team_members WHERE user_id = $1", [userId]);
-        if (existingMembership.rows.length > 0) {
-            return res.status(400).json({ error: "Ви вже перебуваєте в іншій команді" });
+
+        // Перевірка участі у командах одного турніру
+        const teamTournamentsResult = await pool.query(
+            "SELECT tournament_id FROM tournament_teams WHERE team_id = $1",
+            [teamId]
+        );
+        const teamTournaments = teamTournamentsResult.rows.map(row => row.tournament_id);
+
+        if (teamTournaments.length > 0) {
+            const conflict = await pool.query(
+                `SELECT 1
+                 FROM team_members tm
+                 JOIN tournament_teams tt ON tm.team_id = tt.team_id
+                 WHERE tm.user_id = $1 AND tt.tournament_id = ANY($2::int[])`,
+                [userId, teamTournaments]
+            );
+            if (conflict.rows.length > 0) {
+                return res.status(400).json({ error: "Ви вже берете участь у цьому турнірі в іншій команді" });
+            }
         }
-  
+
+        // Перевірка, чи вже є у цій команді
+        const alreadyMember = await pool.query(
+            "SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2",
+            [teamId, userId]
+        );
+        if (alreadyMember.rows.length > 0) {
+            return res.status(400).json({ error: "Ви вже є учасником цієї команди" });
+        }
+
+        // Перевірка на максимальну кількість гравців
         const membersCount = await pool.query("SELECT COUNT(*) FROM team_members WHERE team_id = $1", [teamId]);
-        if (membersCount.rows[0].count >= 5) {
+        if (parseInt(membersCount.rows[0].count) >= 5) {
             return res.status(400).json({ error: "Команда вже заповнена (максимум 5 гравців)" });
         }
-  
+
+        // Додаємо користувача до команди
         await pool.query("INSERT INTO team_members (team_id, user_id) VALUES ($1, $2)", [teamId, userId]);
-  
+
         res.json({ message: "Ви успішно приєдналися до команди" });
     } catch (err) {
         console.error(err);
@@ -272,9 +300,9 @@ exports.getTeamProfile = async (req, res) => {
 // Отримання всіх команд
 exports.getAllTeams = async (req, res) => {
   try {
-    // Отримуємо основну інформацію про всі команди
+    // Додаємо is_private у SELECT
     const teams = await pool.query(`
-      SELECT id, name, discipline 
+      SELECT id, name, discipline, is_private
       FROM teams
       ORDER BY name
     `);
@@ -324,6 +352,7 @@ exports.getAllTeams = async (req, res) => {
           teamId: team.id,
           teamName: team.name,
           discipline: team.discipline,
+          is_private: team.is_private, // ДОДАНО
           rating: rating,
           wins: winsCount,
           losses: lossesCount,
