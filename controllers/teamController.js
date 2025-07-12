@@ -524,3 +524,29 @@ exports.leaveTeam = async (req, res) => {
         res.status(500).json({ error: "Помилка сервера" });
     }
 };
+
+// Видалення команди
+exports.deleteTeam = async (req, res) => {
+  const { teamId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // Перевірити чи користувач капітан цієї команди
+    const isCaptain = await pool.query(
+      `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND is_captain = TRUE`,
+      [teamId, userId]
+    );
+    if (!isCaptain.rows.length) {
+      return res.status(403).json({ error: "Тільки капітан може видалити команду" });
+    }
+
+    // Видалити всіх учасників
+    await pool.query(`DELETE FROM team_members WHERE team_id = $1`, [teamId]);
+    // Видалити команду
+    await pool.query(`DELETE FROM teams WHERE id = $1`, [teamId]);
+    res.json({ message: "Команду видалено" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Помилка сервера" });
+  }
+};

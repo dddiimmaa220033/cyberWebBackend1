@@ -84,4 +84,11 @@ router.get("/",
     teamController.getAllTeams
 );
 
+// Видалити команду (тільки для капітана)
+router.delete('/:teamId',
+    verifyToken,
+    isCaptain,
+    teamController.deleteTeam
+);
+
 module.exports = router;
