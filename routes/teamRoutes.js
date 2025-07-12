@@ -52,6 +52,9 @@ router.post("/:teamId/join",
     teamController.joinTeam
 );
 
+// Вихід з команди
+router.post('/:teamId/leave', verifyToken, teamController.leaveTeam);
+
 // Список команд користувача
 router.get("/my", 
     verifyToken, 

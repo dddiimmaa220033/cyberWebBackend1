@@ -494,3 +494,33 @@ exports.declineInvite = async (req, res) => {
     res.status(500).json({ error: "Помилка сервера" });
   }
 };
+
+// Вихід з команди
+exports.leaveTeam = async (req, res) => {
+    const { teamId } = req.params;
+    const userId = req.user.userId;
+
+    try {
+        // Перевірка чи користувач є учасником
+        const member = await pool.query(
+            "SELECT is_captain FROM team_members WHERE team_id = $1 AND user_id = $2",
+            [teamId, userId]
+        );
+        if (!member.rows.length) {
+            return res.status(400).json({ error: "Ви не є учасником цієї команди" });
+        }
+        // Не дозволяти капітану просто вийти (можна додати окрему логіку)
+        if (member.rows[0].is_captain) {
+            return res.status(400).json({ error: "Капітан не може покинути команду напряму" });
+        }
+        // Видалити користувача з команди
+        await pool.query(
+            "DELETE FROM team_members WHERE team_id = $1 AND user_id = $2",
+            [teamId, userId]
+        );
+        res.json({ message: "Ви вийшли з команди" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+};
